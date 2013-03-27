@@ -340,7 +340,7 @@ int NetGuard_Limit::init(NetGuard_Config *data)
 
 	if (data_->GetInt("default_internal_limit_overall") != MININT)
 	{
-		default_external_limit_overall = data_->GetInt("default_internal_limit_overall");
+		default_internal_limit_overall = data_->GetInt("default_internal_limit_overall");
 		default_internal_limit_overall = default_internal_limit_overall*1024*1024;
 		ng_logdebug("set default_internal_limit_overall to %llu",default_internal_limit_overall);
 	}
