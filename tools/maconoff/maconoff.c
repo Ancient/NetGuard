@@ -361,6 +361,40 @@ char *doportset(char *ip,char *moid, int port, char *value) {
     return tmpresult;
 }
 
+int getportcount(char *ip){
+	char *query = "ifNumber.0";
+    char *tmpresult;
+	int count;
+
+	#ifdef debug
+    printf("entering get port count part\n");
+    #endif
+
+	#ifdef debug
+    printf("query:  %s\n",query);
+    #endif
+
+    tmpresult = doquery(ip,query);
+    if (tmpresult)
+    {
+    	count = atoi(tmpresult);
+	    free(tmpresult);
+		#ifdef debug
+	    printf("port count found:  %d\n",count);
+	    #endif
+		if(count > 48)
+			return 48;
+		else if(count > 24)
+			return 24;
+		else
+		    return count;
+    } else {
+	    free(query);
+	    printf("Error cant get max mac count\n");
+	    return -1;
+    }
+}
+
 int getmaxmacs(char *ip, int port){
     char *maxmacs = "iso.3.6.1.4.1.9.9.315.1.2.1.1.3.%d";
     char *query, *tmpresult;
@@ -658,6 +692,7 @@ void dumpswitchport(char *ip, int port,int maconly) {
     tmpresult = doquery(ip,query);
     printf("Switch: %s (%s) Port: %d\n",tmpresult,ip,port);
     free(tmpresult);
+	printf("Port Count on Switch: %d\n",getportcount(ip));
 
     i = 0;
     if (!maconly)
@@ -721,9 +756,10 @@ void dumpswitchport(char *ip, int port,int maconly) {
 }
 
 void dumpswitch(char *ip, int maconly){
-    int i;
-    for (i=1;i<=24;i++){
-	    printf("\n");
+    int i,count;
+	count = getportcount(ip);
+	for (i=1;i<=count;i++){
+		printf("\n");
 	    dumpswitchport(ip,i,maconly);
 	    printf("\n\n");
     }
@@ -743,7 +779,7 @@ void dumpall(int maconly){
 }
 
 int findmac(char *mac,char **ip, int *port, char **name){
-    int x,y,i = 0;
+    int x,y,i,count = 0;
     char *tmp;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
     char *macquery = "iso.3.6.1.4.1.9.9.315.1.2.2.1.4.%d";
@@ -767,7 +803,8 @@ int findmac(char *mac,char **ip, int *port, char **name){
     while ( switches[i] != NULL && !found)
     {
 	    tmp = (char*)switches[i];
-	    for (x=1;x<=24;x++){
+		count = getportcount(tmp);
+	    for (x=1;x<=count;x++){
 
 		    query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    sprintf(query,macquery,x);
@@ -811,7 +848,7 @@ int findmac(char *mac,char **ip, int *port, char **name){
 }
 
 int findroom(char *room,char **ip, int *port, char **name){
-    int x,i = 0;
+    int x,i,count = 0;
     char *tmp;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
     char  * myroom = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
@@ -829,7 +866,8 @@ int findroom(char *room,char **ip, int *port, char **name){
     while ( switches[i] != NULL && !found)
     {
 	    tmp = (char*)switches[i];
-	    for (x=1;x<=24;x++){
+		count = getportcount(tmp);
+	    for (x=1;x<=count;x++){
             query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
             sprintf(query,namequery,x);
             tmpresult = doquery(tmp,query);
@@ -851,7 +889,7 @@ int findroom(char *room,char **ip, int *port, char **name){
 }
 
 int setvalue(char *ip, int port, char *moid,char *value){
-    int x,i = 0;
+    int x,i,count = 0;
     char *tmp;
 
     char  *query, *myresult,*tmpresult;
@@ -870,7 +908,8 @@ int setvalue(char *ip, int port, char *moid,char *value){
     {
 	    tmp = (char*)switches[i];
 	    if (ip!=NULL) tmp = strdup(ip);
-	    for (x=1;x<=24;x++){
+		count = getportcount(tmp);
+	    for (x=1;x<=count;x++){
 
 		    if (port>0) x=port;
 
@@ -1016,7 +1055,7 @@ void writeconfigall(){
 
 //ronny
 void write_db(){
-    int x,i = 0;
+    int x,i,count = 0;
 
     char *tmp,*tmp2;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
@@ -1037,7 +1076,8 @@ void write_db(){
 	while ( switches[i] != NULL)
 	{
 	    tmp = (char*)switches[i];
-	    for (x=1;x<=24;x++){
+	    count = getportcount(tmp);
+	    for (x=1;x<=count;x++){
         	query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
         	sprintf(query,namequery,x);
         	tmpresult = doquery(tmp,query);
