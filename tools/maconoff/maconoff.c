@@ -759,7 +759,10 @@ void dumpswitch(char *ip, int maconly){
 	count = getportcount(ip);
 	for (i=1;i<=count;i++){
 		printf("\n");
-	    dumpswitchport(ip,i,maconly);
+		if(count > 24)
+			dumpswitchport(ip,10100+i,maconly);
+		else
+		    dumpswitchport(ip,i,maconly);
 	    printf("\n\n");
     }
 }
@@ -778,7 +781,7 @@ void dumpall(int maconly){
 }
 
 int findmac(char *mac,char **ip, int *port, char **name){
-    int x,y,i,count = 0;
+    int x,y,z,i,count = 0;
     char *tmp;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
     char *macquery = "iso.3.6.1.4.1.9.9.315.1.2.2.1.4.%d";
@@ -803,7 +806,11 @@ int findmac(char *mac,char **ip, int *port, char **name){
     {
 	    tmp = (char*)switches[i];
 		count = getportcount(tmp);
-	    for (x=1;x<=count;x++){
+	    for (z=1;z<=count;z++){
+			if(count > 24)
+				x =z+ 10100;
+			else
+				x=z;
 
 		    query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    sprintf(query,macquery,x);
@@ -847,7 +854,7 @@ int findmac(char *mac,char **ip, int *port, char **name){
 }
 
 int findroom(char *room,char **ip, int *port, char **name){
-    int x,i,count = 0;
+    int x,z,i,count = 0;
     char *tmp;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
     char  * myroom = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
@@ -866,7 +873,11 @@ int findroom(char *room,char **ip, int *port, char **name){
     {
 	    tmp = (char*)switches[i];
 		count = getportcount(tmp);
-	    for (x=1;x<=count;x++){
+	    for (z=1;z<=count;z++){
+			if(count > 24)
+				x =z + 10100;
+			else
+				x=z;
             query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
             sprintf(query,namequery,x);
             tmpresult = doquery(tmp,query);
@@ -888,7 +899,7 @@ int findroom(char *room,char **ip, int *port, char **name){
 }
 
 int setvalue(char *ip, int port, char *moid,char *value){
-    int x,i,count = 0;
+    int x,z,i,count = 0;
     char *tmp;
 
     char  *query, *myresult,*tmpresult;
@@ -908,9 +919,14 @@ int setvalue(char *ip, int port, char *moid,char *value){
 	    tmp = (char*)switches[i];
 	    if (ip!=NULL) tmp = strdup(ip);
 		count = getportcount(tmp);
-	    for (x=1;x<=count;x++){
+	    for (z=1;z<=count;z++){
 
-		    if (port>0) x=port;
+			if (port>0) z=port;
+			
+			if(count > 24)
+				x =z + 10100;
+			else
+				x=z;
 
 		    query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    strcpy(query,moid);
@@ -1054,7 +1070,7 @@ void writeconfigall(){
 
 //ronny
 void write_db(){
-    int x,i,count = 0;
+    int x,z,i,count = 0;
 
     char *tmp,*tmp2;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
@@ -1076,7 +1092,12 @@ void write_db(){
 	{
 	    tmp = (char*)switches[i];
 	    count = getportcount(tmp);
-	    for (x=1;x<=count;x++){
+	    for (z=1;z<=count;z++){
+			if(count > 24)
+				x =z+ 10100;
+			else
+				x=z;
+
         	query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
         	sprintf(query,namequery,x);
         	tmpresult = doquery(tmp,query);
@@ -1357,6 +1378,11 @@ int main (int argc, char *argv[]) {
 	printf("setuid: %d\n",getuid());
 	#endif
 	#endif
+
+	//is this on every 48 & more port switch?
+	if(ip && portNum && getportcount(ip) > 24) {
+		portNum = portNum + 10100;
+	}
 
     //lets start
     switch (mode) {
