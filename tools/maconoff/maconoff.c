@@ -390,7 +390,7 @@ int getportcount(char *ip){
 		    return count;
     } else {
 	    free(query);
-	    printf("Error cant get max mac count\n");
+	    printf("Error cant get port count\n");
 	    return -1;
     }
 }
@@ -692,7 +692,6 @@ void dumpswitchport(char *ip, int port,int maconly) {
     tmpresult = doquery(ip,query);
     printf("Switch: %s (%s) Port: %d\n",tmpresult,ip,port);
     free(tmpresult);
-	printf("Port Count on Switch: %d\n",getportcount(ip));
 
     i = 0;
     if (!maconly)
