@@ -47,6 +47,8 @@
 
 #define do_setuid 1000
 
+#define wh8override
+
 void usage(char *progname,char *error);
 
 #ifdef passwdfile
@@ -56,6 +58,7 @@ const char * defaultfilename = "maconoff.conf";
 static char *community = "$ecUr1T4+3";
 #endif
 
+const char * defaultcsvfilename = "/etc/maconoffswitch.csv";
 //set this to 1 if you want to have the wh8 mode in which disable changes the vlan of a port
 int wh8mode = 1;
 #define wh8_enable_vlan 2
@@ -66,7 +69,7 @@ const char *q_portname = "enterprises.9.2.2.1.1.28.%d";
 const char* switches[]={"172.17.1.1","172.17.1.2","172.17.1.3","172.17.1.4",
                         "172.17.2.1","172.17.2.2","172.17.2.3",
                         "172.17.3.1","172.17.3.2","172.17.3.3","172.17.3.4",
-            			"172.17.0.1",
+            			"172.17.0.1","172.17.5.1",
 						NULL};
 
 //ronny...added WRITEDB
@@ -1144,6 +1147,12 @@ int main (int argc, char *argv[]) {
     opterr = 0;
     portNum = -1;
 
+	FILE * CSV;
+	int wh8ov = 0;
+	char *ip1, *ip2;
+	int ip11,ip12,ip13,ip14,ip21,ip22,ip23,ip24;
+	int port1, port2;
+
     while ( (option = getopt( argc, argv, "fi:p:m:r:s:a:o:v:c:" )) != EOF) {
 	    switch (tolower(option)) {
 		    case 'c':
@@ -1161,8 +1170,23 @@ int main (int argc, char *argv[]) {
 				#ifdef debugmode
 			    printf("Backbone Switch %s found.\n",ip);
 			    #endif
+				wh8ov=1;
 			    break;
 		    case 'p':
+				port=optarg;
+			    portNum=atoi(port);
+				#ifdef debugmode
+			    printf("Port %d found.\n",portNum);
+			    #endif
+				wh8ov=1;
+			    break;
+			case 'j':
+			    ip = optarg;
+				#ifdef debugmode
+			    printf("Backbone Switch %s found.\n",ip);
+			    #endif
+			    break;
+		    case 'q':
 				port=optarg;
 			    portNum=atoi(port);
 				#ifdef debugmode
@@ -1352,6 +1376,35 @@ int main (int argc, char *argv[]) {
 				break;
 	    }
     }
+
+	if(wh8ov)
+	{
+		#ifdef debugmode
+			printf("start IP override\n");
+		#endif
+		CSV = fopen(defaultcsvfilename, "r");
+		
+		ip1 = calloc(16,sizeof(char));
+		ip2 = calloc(16,sizeof(char));
+
+		if(NULL == CSV) {
+			printf("Fehler beim Oeffnen der Switch Zuordnungsdatei\n");
+		}else{
+			while((fscanf(CSV,"%d.%d.%d.%d;%d;%d.%d.%d.%d;%d;\n",&ip11,&ip12,&ip13,&ip14,&port1,&ip21,&ip22,&ip23,&ip24,&port2)) != EOF ){
+				sprintf(ip1,"%d.%d.%d.%d",ip11,ip12,ip13,ip14);
+				sprintf(ip2,"%d.%d.%d.%d",ip21,ip22,ip23,ip24);
+				if (!strcmp(ip1,ip) && portNum==port1){
+					#ifdef debugmode
+						printf("Rewrite to ip: %s port: %d.\n",ip2,port2);
+					#endif
+					ip = ip2;
+					portNum = port2;
+					break;
+				}
+			}
+			fclose(CSV);
+		}
+	}
 
     #ifdef passwdfile
     if (!configfile) {
