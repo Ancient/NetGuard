@@ -41,8 +41,10 @@
 #include "../../includes/storage/user_data.hpp"
 #include "../../includes/storage/group_data.hpp"
 #include "../../includes/storage/user_limits.hpp"
+#include "../../includes/storage/user_special_limits.hpp"
 #include "../../includes/state/state_handling.hpp"
 #include "../../includes/tools.h"
+#include "../../modules/user_special_limit/user_special_limit.hpp"
 #include "../../modules/user_limit/user_limit.hpp"
 #include "../../includes/modules/general_module.hpp"
 #include "../../includes/modules/user_module.hpp"
@@ -57,6 +59,7 @@
 #define NG_GFILENAME "./gaccounting.dat"
 #define NG_SFILENAME "./states.dat"
 #define NG_LFILENAME "./limit.dat"
+#define NG_SLFILENAME "./special_limit.dat"
 //#define debug
 
 
@@ -244,6 +247,38 @@ int write_limit(MYSQL *mysql,std::string tablename, std::string indexfield, std:
 	return 0;
 }
 
+
+int write_special_limit(MYSQL *mysql,std::string tablename, std::string indexfield, std::string indexvalue,struct user_data *u_data) 
+{
+    char* tmpdata = (char*)malloc(sizeof(unsigned char)*10000);
+
+	struct user_special_limit_data *limit_data;
+
+	limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
+
+	if ( limit_data == NULL ) return 1;
+
+	sprintf(tmpdata,"delete from %s where %s=\"%s\" ;",
+		tablename.c_str(),
+		indexfield.c_str(),	indexvalue.c_str()
+		);
+	runquery(mysql,tmpdata);
+
+
+	sprintf(tmpdata,"insert into %s (%s,`limit`,daily_addition,max_limit) values (\"%s\",\"%llu\",\"%llu\",\"%llu\");",
+	tablename.c_str(),
+	indexfield.c_str(),	indexvalue.c_str(),
+	*(&limit_data->limit),
+	*(&limit_data->daily_addition),
+	*(&limit_data->max_limit));
+	runquery(mysql,tmpdata);
+
+	free(tmpdata);
+
+	return 0;
+
+}
+
 int main()
 {
     MYSQL mysql;
@@ -266,6 +301,12 @@ int main()
 	nglimit.set_user_data(&data);
 	nglimit.db_filename = NG_LFILENAME;
 	nglimit.loaddata();
+
+	NetGuard_Special_Limit ngslimit = NetGuard_Special_Limit();
+	ngslimit.set_user_data(&data);
+	ngslimit.db_filename = NG_SLFILENAME;
+	ngslimit.loaddata();
+	
 
 	NetGuard_State_Handler state_handler = NetGuard_State_Handler();
 	state_handler.loaddata(NG_SFILENAME);
@@ -299,7 +340,7 @@ int main()
 	runquery(&mysql,tmpdata);
 
 	//LOCK TABLES
-    sprintf(tmpdata,"lock tables global write, global_states write, global_states_data write, group_states write, group_states_data write,limits write, groups_members write, glimits write, traffic write, groups write, gtraffic write;"); 
+    sprintf(tmpdata,"lock tables global write, global_states write, global_states_data write, group_states write, group_states_data write,limits write, groups_members write, glimits write, traffic write, groups write, gtraffic write, special_limit write;"); 
 	runquery(&mysql,tmpdata);   
 
     user_data_list user_list = data.get_vector_list();
@@ -374,7 +415,7 @@ int main()
 
 		time = localtime(&(u_data->last_activity));
 		strftime(l_a_time, 80, "%Y-%m-%d %H:%M:%S",time);
- 		sprintf(tmpdata,"insert into global (ip,vlan,mac,last_active,room,login,current_state,disable_count) values (\"%s\",%d,\"%02x:%02x:%02x:%02x:%02x:%02x\",\"%s\",\"%s\",\"%s\",%d,%d);",
+ 		sprintf(tmpdata,"insert into global (ip,vlan,mac,last_active,room,login,current_state,disable_count,current_traffic) values (\"%s\",%d,\"%02x:%02x:%02x:%02x:%02x:%02x\",\"%s\",\"%s\",\"%s\",%d,%d,%llu);",
  					inet_ntoa(*(struct in_addr *)&u_data->saddr),
  					u_data->vlan_id,
  					u_data->hw_addr[0],u_data->hw_addr[1],u_data->hw_addr[2],u_data->hw_addr[3],u_data->hw_addr[4],u_data->hw_addr[5],
@@ -382,7 +423,8 @@ int main()
  					user_state->params()->GetStr("room").c_str(),
  					user_state->params()->GetStr("login").c_str(),
 					current_state,
-					user_state->params()->GetInt("external_week_exceeded",0)
+					user_state->params()->GetInt("external_week_exceeded",0),
+					u_data->external.bytes
  		); 
 		runquery(&mysql,tmpdata);
 
@@ -390,6 +432,7 @@ int main()
 		std::string mvalue = tmpdata;
 	    write_traffic(&mysql,"traffic","ip",mvalue,u_data);
 		write_limit(&mysql,"limits","ip",mvalue,u_data,NULL);
+		write_special_limit(&mysql,"special_limit","ip",mvalue,u_data);
 		user_state = NULL;
 	}
 

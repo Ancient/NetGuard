@@ -84,6 +84,7 @@ typedef struct user_data_traffic
 	user_data_timeslot  over_all;
 	user_data_timeslot  days[7];
 	user_data_timeslot  week;
+	long long int bytes;
 } user_data_traffic;
 
 typedef struct user_data
