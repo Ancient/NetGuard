@@ -398,6 +398,29 @@ int getportcount(char *ip){
     }
 }
 
+int getportnumber(char*ip, int port)
+{
+	char *query = "ifIndex.2";
+    char *tmpresult;
+
+	#ifdef debug
+    printf("entering get port count part\n");
+    #endif
+
+	#ifdef debug
+    printf("query:  %s\n",query);
+    #endif
+
+    tmpresult = doquery(ip,query);
+    if (tmpresult)
+    {
+		return port;
+	}else{
+		return (10100+port);
+	}
+
+}
+
 int getmaxmacs(char *ip, int port){
     char *maxmacs = "iso.3.6.1.4.1.9.9.315.1.2.1.1.3.%d";
     char *query, *tmpresult;
@@ -762,10 +785,7 @@ void dumpswitch(char *ip, int maconly){
 	count = getportcount(ip);
 	for (i=1;i<=count;i++){
 		printf("\n");
-		if(count > 24)
-			dumpswitchport(ip,10100+i,maconly);
-		else
-		    dumpswitchport(ip,i,maconly);
+		dumpswitchport(ip,getportnumber(ip,i),maconly);
 	    printf("\n\n");
     }
 }
@@ -810,11 +830,7 @@ int findmac(char *mac,char **ip, int *port, char **name){
 	    tmp = (char*)switches[i];
 		count = getportcount(tmp);
 	    for (z=1;z<=count;z++){
-			if(count > 24)
-				x =z+ 10100;
-			else
-				x=z;
-
+			x = getportnumber(tmp,z);
 		    query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    sprintf(query,macquery,x);
 		    dowalkquery(tmp,query,results);
@@ -877,10 +893,8 @@ int findroom(char *room,char **ip, int *port, char **name){
 	    tmp = (char*)switches[i];
 		count = getportcount(tmp);
 	    for (z=1;z<=count;z++){
-			if(count > 24)
-				x =z + 10100;
-			else
-				x=z;
+			x = getportnumber(tmp,z);
+
             query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
             sprintf(query,namequery,x);
             tmpresult = doquery(tmp,query);
@@ -926,10 +940,7 @@ int setvalue(char *ip, int port, char *moid,char *value){
 
 			if (port>0) z=port;
 			
-			if(count > 24)
-				x =z + 10100;
-			else
-				x=z;
+			x = getportnumber(ip,z);
 
 		    query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    strcpy(query,moid);
@@ -1096,11 +1107,7 @@ void write_db(){
 	    tmp = (char*)switches[i];
 	    count = getportcount(tmp);
 	    for (z=1;z<=count;z++){
-			if(count > 24)
-				x =z+ 10100;
-			else
-				x=z;
-
+			x = getportnumber(tmp,z);
         	query = calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
         	sprintf(query,namequery,x);
         	tmpresult = doquery(tmp,query);
@@ -1432,9 +1439,8 @@ int main (int argc, char *argv[]) {
 	#endif
 	#endif
 
-	//is this on every 48 & more port switch?
-	if(ip && portNum && getportcount(ip) > 24) {
-		portNum = portNum + 10100;
+	if(ip && portNum) {
+		portNum = getportnumber(ip, portNum);
 	}
 
     //lets start
