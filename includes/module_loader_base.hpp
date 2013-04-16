@@ -281,7 +281,7 @@ class NetGuard_ModuleLoader_Base
 		inline static std::string GetLogDateStr() {
 			char buffer [120];
 			const struct tm * timeinfo = NetGuard_ModuleLoader_Base::GetTime();
-			strftime (buffer,120,GlobalCFG::GetStr("log_time_format","%s %T").c_str(),timeinfo);
+			strftime (buffer,120,GlobalCFG::GetStr("log_time_format","%x %T").c_str(),timeinfo);
 			return buffer;
 		}
 
