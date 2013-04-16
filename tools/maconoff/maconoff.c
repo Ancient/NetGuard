@@ -58,7 +58,7 @@ const char * defaultfilename = "maconoff.conf";
 static char *community = "$ecUr1T4+3";
 #endif
 
-const char * defaultcsvfilename = "/etc/maconoffswitch.csv";
+const char * defaultcsvfilename = "/etc/maconoff/rewrite.db";
 //set this to 1 if you want to have the wh8 mode in which disable changes the vlan of a port
 int wh8mode = 1;
 #define wh8_enable_vlan 2
@@ -66,11 +66,7 @@ int wh8mode = 1;
 
 static char *nullmac   = "00:00:00:00:00:00";
 const char *q_portname = "enterprises.9.2.2.1.1.28.%d";
-const char* switches[]={"172.17.1.1","172.17.1.2",
-                        "172.17.2.1","172.17.2.2","172.17.2.3",
-                        "172.17.3.1","172.17.3.2","172.17.3.3","172.17.3.4",
-            			"172.17.0.1","172.17.5.1",
-						NULL};
+char *switches[1000];
 
 //ronny...added WRITEDB
 typedef enum { UNKOWN, DUMP, SET , FIND, VALUE, DOWRITE, WRITEDB,INFO} pmode_t;
@@ -418,7 +414,6 @@ int getportnumber(char*ip, int port)
 	}else{
 		return (10100+port);
 	}
-
 }
 
 int getmaxmacs(char *ip, int port){
@@ -1133,6 +1128,29 @@ void write_db(){
     }
 }
 
+void read_switch_db(){
+	FILE *db;
+	char *ip;
+	int i;
+
+	i = 0;
+	db = fopen("/etc/maconoff/switch.db", "r");
+	ip = calloc(16,sizeof(char));
+	
+	if(NULL == db) {
+		printf("Error while loading Switch Database!\n");
+		exit(1);
+	}else{
+		while((fscanf(db,"%s\n",ip)) != EOF ){
+			switches[i] = (char*)calloc(16, sizeof(char));
+			strcpy(switches[i],ip);
+			i++;
+		}
+		fclose(db);
+		switches[i] = NULL;
+	}
+}
+
 int main (int argc, char *argv[]) {
     char *ip=NULL, *port=NULL, *mac=NULL, *status=NULL, *moid= NULL, *value= NULL;
     char option;
@@ -1144,6 +1162,7 @@ int main (int argc, char *argv[]) {
     FILE *filehandle;
     #endif
 
+	read_switch_db();
 
     state_t mode = UNKOWN;
     dumpstate_t dmode = DUMPPORT;
