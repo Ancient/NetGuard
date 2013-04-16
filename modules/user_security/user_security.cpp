@@ -645,6 +645,9 @@ void NetGuard_Security::packet_in(struct user_data *u_data, int *mode, unsigned 
 		dest_mac_addr = &eth->ether_dhost;
 		src_addr = &ip->saddr;
 		dst_addr = &ip->daddr;
+
+		struct user_data *found_data = get_user(source_mac_addr,vlanid);
+
 		switch (*mode)
 		{
 		case TRAFFIC_OUTGOING:
@@ -669,10 +672,28 @@ void NetGuard_Security::packet_in(struct user_data *u_data, int *mode, unsigned 
 				sprint_package(tmpstr,vlanid,h,eth,ip,tcp,data);
 				ng_logerror("TRAFFIC_OUTGOING (ip) we got a NULL user_state !? package: %s",tmpstr);
 				free(tmpstr);
-				return; 
 			}
-			
-			if ((*user_state) == mode_enabled) {
+
+			if (found_data && found_data != u_data)
+			{
+				if (Mac_IgnoreSpoof->match(source_mac_addr,vlanid)) return;
+				//we have a matching mac for the sender but he wasnt found by his ip (as its in this modes)-> spoofing
+				ng_log_buff(2,"ip spoofed for %02x:%02x:%02x:%02x:%02x:%02x src_ip: %s", printf_mac_params((*source_mac_addr)),inet_ntoa(*(struct in_addr *)&found_data->saddr));
+				ng_log_buff(0,"spoofed: %s",inet_ntoa(*(struct in_addr *)src_addr));
+
+				user_state = NetGuard_State_Handler::user_state(found_data);
+				if (user_state)
+				{
+					if(!user_state->set(mode_disabled,GlobalCFG::GetStr("user_security.disabled_ip_spoofed","IP Spoofed"))) {
+						ng_logerror("%s - %s - %d - ip: %s vlan: %d - could not do the state transition from %s to %s",__FUNCTION__,__FILE__,__LINE__,inet_ntoa(*(struct in_addr *)&user_state->Getuser().saddr),user_state->Getuser().vlan_id,user_state->state()->GetName().c_str(),mode_disabled->GetName().c_str());
+						return;
+					}
+				}
+				char *tmpstr = (char*)malloc(5000);
+				sprint_package(tmpstr,vlanid,h,eth,ip,tcp,data);
+				ng_log_buff(0,"%s",tmpstr);
+				free(tmpstr);
+			} else	if ((*user_state) == mode_enabled) {
 				//source mac ok ?
 				if (!compare_mac(source_mac_addr,&security_data->hw_addr))
 				{
@@ -727,7 +748,7 @@ void NetGuard_Security::packet_in(struct user_data *u_data, int *mode, unsigned 
 
 			if (Mac_IgnoreSpoof->match(source_mac_addr,vlanid)) return;
 
-			struct user_data *found_data = get_user(source_mac_addr,vlanid);
+			
 			if (found_data)
 			{
 				//we have a matching mac for the sender but he wasnt found by his ip (as its in this modes)-> spoofing
