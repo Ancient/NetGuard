@@ -65,7 +65,7 @@
 
 //static char *nullmac   = "00:00:00:00:00:00";
 const char *q_portname = "enterprises.9.2.2.1.1.28.%d";
-const char* switches[]={"172.17.1.1","172.17.1.2","172.17.1.3","172.17.1.4",
+const char* switches[]={"172.17.1.1","172.17.1.2","172.17.5.1",
                         "172.17.2.1","172.17.2.2","172.17.2.3",
                         "172.17.3.1","172.17.3.2","172.17.3.3","172.17.3.4",
             			"172.17.0.1",
@@ -271,6 +271,62 @@ char *NetGuard_Command_Input_WH8::doportset(char *ip,char *oid, int port, char *
     return tmpresult;
 }
 
+int NetGuard_Command_Input_WH8::getportcount(char *ip){
+	const char *query = "ifNumber.0";
+    char *tmpresult;
+	int count;
+
+	#ifdef debug
+    printf("entering get port count part\n");
+    #endif
+
+	#ifdef debug
+    printf("query:  %s\n",query);
+    #endif
+
+    tmpresult = doquery(ip,(char*)query);
+    if (tmpresult)
+    {
+    	count = atoi(tmpresult);
+	    free(tmpresult);
+		#ifdef debug
+	    printf("port count found:  %d\n",count);
+	    #endif
+		if(count > 48)
+			return 48;
+		else if(count > 24)
+			return 24;
+		else
+		    return count;
+    } else {
+	    free((char*)query);
+	    printf("Error cant get port count\n");
+	    return -1;
+    }
+}
+
+int NetGuard_Command_Input_WH8::getportnumber(char *ip, int port){
+	const char *query = "ifIndex.2";
+    char *tmpresult;
+
+	#ifdef debug
+    printf("entering get port count part\n");
+    #endif
+
+	#ifdef debug
+    printf("query:  %s\n",query);
+    #endif
+
+    tmpresult = doquery(ip,(char*)query);
+    if (tmpresult)
+    {
+		return port;
+	}else{
+		return (10100+port);
+	}
+}
+
+
 int NetGuard_Command_Input_WH8::getmaxmacs(u_int32_t ip, int port){
     const char *maxmacs = "iso.3.6.1.4.1.9.9.315.1.2.1.1.3.%d";
     char *query, *tmpresult;
@@ -364,7 +420,7 @@ unsigned char *NetGuard_Command_Input_WH8::getmacfromoid(char *input) {
 }
 
 bool NetGuard_Command_Input_WH8::find_mac(mac_addr mac,u_int32_t *ip, int *port, string *name) {
-    int x,y,i = 0;
+    int x,y,z,i,count = 0;
     char *tmp;
     const char* namequery = "enterprises.9.2.2.1.1.28.%d";
     const char *macquery = "iso.3.6.1.4.1.9.9.315.1.2.2.1.4.%d";
@@ -388,7 +444,9 @@ bool NetGuard_Command_Input_WH8::find_mac(mac_addr mac,u_int32_t *ip, int *port,
     while ( switches[i] != NULL && !found)
     {
 	    tmp = (char*)switches[i];
-	    for (x=1;x<=24;x++){
+		count = getportcount(tmp);
+	    for (z=1;z<=count;z++){
+			x = getportnumber(tmp,z);
 
 		    query = (char*)calloc(MAXDUMPQUERRYLENGTH,sizeof(char));
 		    sprintf(query,macquery,x);

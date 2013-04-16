@@ -74,6 +74,9 @@ class NetGuard_Command_Input_WH8: public NetGuard_Command_Input_Module
 		char *doportquery(char *ip,char *oid, int port);
 		char *doportset(char *ip,char *oid, int port, char *value);
 
+		int getportcount(char *ip);
+		int getportnumber(char *ip, int port);
+
 		int getmaxmacs(u_int32_t ip, int port);
 		int getmacslearned(u_int32_t ip, int port);
 		unsigned char *getmacfrommac_addr(mac_addr mac);
