@@ -400,6 +400,7 @@ void NetGuard_Accounting::got_input(std::vector<std::string> params, std::vector
 	if (params[0] == "help")
 	{
 		ng_logout("forget_day <day> - forget all accounting for this weekday (0 = sunday)");
+		ng_logout("forget <ip> <vlan> - forget all accounting for user");
 		ng_logout("save_full - save userdata at once - no little chunks");
 		#ifndef userlist_use_simple
 		ng_logout("save_junksize <items> - number of items to save at once");
@@ -599,6 +600,56 @@ void NetGuard_Accounting::got_input(std::vector<std::string> params, std::vector
 			}	
 
 		}
+	}
+
+	if (params[0] == "forget")
+	{
+		if (params.size() != 3)
+		{
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: forget <ip> <vlan>");
+			return;
+		}
+
+		struct in_addr m_ip;
+		if (!inet_aton(params[1].c_str(),&m_ip ))
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: forget <ip> <vlan>");
+			return;
+		}
+
+		
+		if (intparams[2]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: forget <ip> <vlan>");
+			return;
+		}
+
+		unsigned int tmpvlan = intparams[2];
+
+		struct user_data *u_data = userlist->get_user(&m_ip.s_addr,&tmpvlan);
+		if (!u_data) {
+			ng_logout_not_found("user not found!");
+			return;
+		}
+
+		if (u_data->saddr != m_ip.s_addr) {
+			ng_logout_not_found("user not found!");
+			return;
+		}
+
+		for(int i=0;i<7;i++)
+		{
+			memset(&u_data->external.days[i],0,sizeof(struct user_data_timeslot));
+			memset(&u_data->internal.days[i],0,sizeof(struct user_data_timeslot));
+		}
+		memset(&u_data->external.week,0,sizeof(struct user_data_timeslot));
+		memset(&u_data->internal.week,0,sizeof(struct user_data_timeslot));
+
+		memset(&u_data->external.over_all,0,sizeof(struct user_data_timeslot));
+		memset(&u_data->internal.over_all,0,sizeof(struct user_data_timeslot));
+		
+
+		ng_logout_ok("forgot data for user: %s ",inet_ntoa(*(struct in_addr *)&u_data->saddr));
 	}
 
 	if (params[0] == "version")
