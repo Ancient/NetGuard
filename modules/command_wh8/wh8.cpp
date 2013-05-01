@@ -65,11 +65,7 @@
 
 //static char *nullmac   = "00:00:00:00:00:00";
 const char *q_portname = "enterprises.9.2.2.1.1.28.%d";
-const char* switches[]={"172.17.1.1","172.17.1.2","172.17.5.1",
-                        "172.17.2.1","172.17.2.2","172.17.2.3",
-                        "172.17.3.1","172.17.3.2","172.17.3.3","172.17.3.4",
-            			"172.17.0.1",
-						NULL};
+char *switches[1000];
 
 void NetGuard_User_SCE_WH8::done_state_change(NetGuard_User_State *user, NetGuard_State **from, NetGuard_State *to,std::string reason)
 {
@@ -125,6 +121,8 @@ int NetGuard_Command_Input_WH8::init(NetGuard_Config *data) {
 	community = data_->GetStr("community");
 
 	NetGuard_State_Handler::GetPointer()->register_exec(new NetGuard_User_SCE_WH8(this));
+
+	read_switch_db();
 
 	return 0;
 }
@@ -185,6 +183,29 @@ char *NetGuard_Command_Input_WH8::doquery(char *ip, char* oid){
     };
     session_close(snmp_sess);
     return result;
+}
+
+void NetGuard_Command_Input_WH8::read_switch_db(){
+	FILE *db;
+	char *ip;
+	int i;
+
+	i = 0;
+	db = fopen("/etc/maconoff/switch.db", "r");
+	ip = (char*)calloc(16,sizeof(char));
+	
+	if(NULL == db) {
+		printf("Error while loading Switch Database!\n");
+		exit(1);
+	}else{
+		while((fscanf(db,"%s\n",ip)) != EOF ){
+			switches[i] = (char*)calloc(16, sizeof(char));
+			strcpy(switches[i],ip);
+			i++;
+		}
+		fclose(db);
+		switches[i] = NULL;
+	}
 }
 
 void NetGuard_Command_Input_WH8::dowalkquery(char *ip, char* oid, char *results[]) {

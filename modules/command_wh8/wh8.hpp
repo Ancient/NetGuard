@@ -88,6 +88,8 @@ class NetGuard_Command_Input_WH8: public NetGuard_Command_Input_Module
 		NetGuard_Command_Input_WH8();
 		~NetGuard_Command_Input_WH8();
 
+		void read_switch_db();
+
 		int init(NetGuard_Config *data);
 
 		void got_input(std::vector<std::string> params, std::vector<int> intparams, std::string command);
