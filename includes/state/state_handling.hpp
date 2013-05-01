@@ -106,10 +106,10 @@ class NetGuard_State_Failure : public NetGuard_State
 	public:
 		NetGuard_State_Failure(): NetGuard_State("failure") {
 			valid_to.insert("disabled");
-			valid_to.insert("learn");
 			valid_to.insert("enabled");
 			valid_from.insert("enabled");
 			valid_from.insert("disabled");
+			valid_from.insert("learn");
 		};
 };
 
@@ -119,6 +119,7 @@ class NetGuard_State_Disabled : public NetGuard_State
 		NetGuard_State_Disabled(): NetGuard_State("disabled") {
 			valid_from.insert("enabled");
 			valid_from.insert("learn");
+			valid_from.insert("failure");
 			valid_to.insert("enabled");
 			valid_to.insert("learn");
 			valid_to.insert("failure");
@@ -144,6 +145,7 @@ class NetGuard_State_Enabled : public NetGuard_State
 			valid_from.insert("unkown");
 			valid_from.insert("disabled");
 			valid_from.insert("learn");
+			valid_from.insert("failure");
 			valid_to.insert("disabled");
 			valid_to.insert("learn");
 			valid_to.insert("failure");
