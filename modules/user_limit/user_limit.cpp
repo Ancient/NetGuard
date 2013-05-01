@@ -59,8 +59,7 @@ NetGuard_Limit::NetGuard_Limit()
 	my_dis_state = NULL;
 	my_fail_state = NULL;
 
-	default_external_limit_week = 5; //5GB
-	default_external_limit_week = default_external_limit_week * 1024 * 1024 * 1024;
+	default_external_limit_week = 0;
 	default_internal_limit_week = 0; 
 	default_external_limit_day  = 0;
 	default_internal_limit_day  = 0;
