@@ -67,7 +67,7 @@ NetGuard_Special_Limit::NetGuard_Special_Limit()
 	default_daily_addition = 1;
 	default_daily_addition = default_daily_addition * 1024 * 1024 * 1024;
 
-	default_max_limit = 12;
+	default_max_limit = 21;
 	default_max_limit = default_max_limit * 1024 * 1024 * 1024;
 
 	htons_ETHERTYPE_IP = htons(ETHERTYPE_IP);
@@ -454,14 +454,17 @@ void NetGuard_Special_Limit::user_shutdown(struct user_data *u_data)
 }
 
 
-void NetGuard_Special_Limit::do_user_data_forgetday(int day, struct  user_data_traffic * u_data_traffic){
-	long long int counter = 0;
+void NetGuard_Special_Limit::do_user_data_forgetday(int day, struct user_data *u_data){
+
+	struct user_special_limit_data *limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
+	if ( limit_data == NULL ) {
+		limit_data = my_user_init(u_data,true);
+	}
 	
-	counter = u_data_traffic->bytes + default_daily_addition;
-	if(counter > default_max_limit)
-		u_data_traffic->bytes = default_max_limit;
+	if((u_data->external.bytes + limit_data->daily_addition) > limit_data->max_limit)
+		 u_data->external.bytes = limit_data->max_limit;
 	else
-		u_data_traffic->bytes += default_daily_addition;
+		 u_data->external.bytes += limit_data->daily_addition;
 
 }
 
@@ -480,7 +483,7 @@ void NetGuard_Special_Limit::user_data_forgetday(int day)
 	#endif
 
 		//forget this day for external traffic
-		do_user_data_forgetday(day,&u_data->external);
+		do_user_data_forgetday(day,u_data);
 
 		#ifdef userlist_use_simple
 		m_users = m_users->next;
@@ -501,7 +504,7 @@ void NetGuard_Special_Limit::checkmax(struct user_special_limit_data * limit_dat
 			if (*nu_state == my_dis_state) return;
 			if (*nu_state == my_fail_state) return;
 
-			nu_state->params()->SetInt("external_limit_exceeded",nu_state->params()->GetInt("external_limit_exceeded",0)+1);
+			//nu_state->params()->SetInt("external_limit_exceeded",nu_state->params()->GetInt("external_limit_exceeded",0)+1);
 			if (!nu_state->set(my_dis_state,GlobalCFG::GetStr("user_limit.disable_int_state_overall_msg","user have no traffic left"))) {
 				ng_logerror("%s - %s - %d - ip: %s vlan: %d - could not do the state transition from %s to %s",__FUNCTION__,__FILE__,__LINE__,inet_ntoa(*(struct in_addr *)&nu_state->Getuser().saddr),nu_state->Getuser().vlan_id,nu_state->state()->GetName().c_str(),my_dis_state->GetName().c_str());
 				return;
@@ -520,8 +523,6 @@ void NetGuard_Special_Limit::packet_in(struct user_data *u_data, int *mode, unsi
 	//we are only interested in packages that are linked to a user already	
 	if (!u_data) return;
 
-	
-	
 	struct user_special_limit_data *limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
 	if ( limit_data == NULL ) {
 		limit_data = my_user_init(u_data,true);
@@ -545,25 +546,30 @@ void NetGuard_Special_Limit::packet_in(struct user_data *u_data, int *mode, unsi
 		if ((*filter_own)==&hl_daddr) index_addr2 = (uint32_t *)&arph->arp_tpa;
 	}
 
+	
 
 	struct user_data_traffic *traffic_type;
 	
 	//set if internal or external traffic
 	//default is internal for all non ip protocols
 
-	traffic_type = &u_data->internal;
+
 	if (eth->ether_type == htons_ETHERTYPE_IP) {
 		//on ip its external per default
 		traffic_type = &u_data->external;
 
-		//if it match the filters its internal
-		if ((*filter_intern) == &hl_daddr && (*filter_intern)==&hl_saddr) traffic_type = &u_data->internal;
-	}
+		//if it match the filters its internal -> return
+		if ((*filter_intern) == &hl_daddr && (*filter_intern)==&hl_saddr) return;
+	}else
+		return;
 
-	traffic_type->bytes = traffic_type->bytes - h->tp_len;
-	
-	//we only check data thats comming from the user in question
-	if (*mode != TRAFFIC_OUTGOING) return;
+	signed long long int tmpval;
+	tmpval = traffic_type->bytes;
+
+	if((tmpval - h->tp_len) >= 0)
+		traffic_type->bytes = traffic_type->bytes - h->tp_len;
+	else 
+		traffic_type->bytes = 0;
 
 	checkmax(limit_data,u_data);
 }
@@ -573,6 +579,11 @@ void NetGuard_Special_Limit::got_input(std::vector<std::string> params, std::vec
 	if (params[0] == "help")
 	{
 		ng_logout("save - save limit data");
+		ng_logout("dumpip <ip> <vlan> - show details for an ip");
+		ng_logout("dumpip_all <ip> <vlan> - show details for an ip");
+		ng_logout("set_limit <ip> <vlan> <start limit MB> <daily add MB> <maximum MB> - set limit data for an ip");
+		//TODO: ng_logout("set_limit_reset <ip> <vlan> - set limit data for an ip to default"); 
+		ng_logout("set_current_traffic <ip> <vlan> <traffic MB> - set the current traffic volume for an ip");
 	}
 
 	if (params[0] == "version")
@@ -585,7 +596,154 @@ void NetGuard_Special_Limit::got_input(std::vector<std::string> params, std::vec
 		savedata();
 	}
 
+	if ((params[0] == "dumpip") ||  (params[0] == "dumpip_all"))
+	{
+		if (params.size() != 3)
+		{
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan>",params[0].c_str());
+			return;
+		}
+		struct in_addr m_ip;
+		if (!inet_aton(params[1].c_str(),&m_ip ))
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan>",params[0].c_str());
+			return;
+		}
+		if (intparams[2]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan>",params[0].c_str());
+			return;
+		}
 
+		unsigned int tmpvlanid = intparams[2];
+		struct user_data *u_data = muser_data->get_user(&m_ip.s_addr,&tmpvlanid);
+		if (!u_data) 
+		{
+			ng_logout_not_found("could not find user with ip: %s vlan: %d",inet_ntoa(*(struct in_addr *)&m_ip.s_addr),intparams[2]);
+			return;
+		}
+		
+
+		#define EINHEIT 1024/1024
+		struct user_special_limit_data *limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
+		if ( limit_data == NULL ) {
+			limit_data = my_user_init(u_data,true);
+		}
+
+		ng_logout("start limit \t\t: %llu MByte",limit_data->limit/EINHEIT);
+		ng_logout("daily addition \t\t: %llu MByte",limit_data->daily_addition/EINHEIT);
+		ng_logout("max limit \t\t: %llu MByte",limit_data->max_limit/EINHEIT);
+
+		ng_logout("current usage \t\t: %llu MByte",u_data->external.bytes/EINHEIT);
+	}
+
+	if ((params[0] == "set_limit"))
+	{
+		if (params.size() != 6)
+		{
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+		struct in_addr m_ip;
+		if (!inet_aton(params[1].c_str(),&m_ip ))
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+		if (intparams[2]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+
+		if (intparams[3]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+
+		if (intparams[4]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+
+		if (intparams[5]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <start limit MB> <daily add MB> <maximum MB>",params[0].c_str());
+			return;
+		}
+
+		unsigned int tmpvlanid = intparams[2];
+		struct user_data *u_data = muser_data->get_user(&m_ip.s_addr,&tmpvlanid);
+		if (!u_data) 
+		{
+			ng_logout_not_found("could not find user with ip: %s vlan: %d",inet_ntoa(*(struct in_addr *)&m_ip.s_addr),intparams[2]);
+			return;
+		}
+
+		struct user_special_limit_data *special_limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
+		if ( special_limit_data == NULL ) {
+			special_limit_data = my_user_init(u_data,true);
+		}
+
+		#define EINHEIT2 1024*1024
+
+		unsigned long long int tmpval,tmpval2,tmpval3;
+		tmpval = (unsigned long long int)intparams[3] * (unsigned long long int)EINHEIT2;
+		tmpval2 = (unsigned long long int)intparams[4] * (unsigned long long int)EINHEIT2;
+		tmpval3 = (unsigned long long int)intparams[5] * (unsigned long long int)EINHEIT2;
+
+		ng_logout_ok("setting new special limit data");
+		special_limit_data->limit = tmpval;
+		special_limit_data->daily_addition = tmpval2;
+		special_limit_data->max_limit = tmpval3;
+
+	}
+
+	if ((params[0] == "set_current_traffic"))
+	{
+		if (params.size() != 4)
+		{
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <traffic MB>",params[0].c_str());
+			return;
+		}
+		struct in_addr m_ip;
+		if (!inet_aton(params[1].c_str(),&m_ip ))
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <traffic MB>",params[0].c_str());
+			return;
+		}
+		if (intparams[2]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <traffic MB>",params[0].c_str());
+			return;
+		}
+
+		if (intparams[3]==MININT)
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: %s <ip> <vlan> <traffic MB>",params[0].c_str());
+			return;
+		}
+
+		unsigned int tmpvlanid = intparams[2];
+		struct user_data *u_data = muser_data->get_user(&m_ip.s_addr,&tmpvlanid);
+		if (!u_data) 
+		{
+			ng_logout_not_found("could not find user with ip: %s vlan: %d",inet_ntoa(*(struct in_addr *)&m_ip.s_addr),intparams[2]);
+			return;
+		}
+
+		#define EINHEIT 1024/1024
+		#define EINHEIT2 1024*1024
+
+		unsigned long long int tmpval;
+
+		tmpval = (unsigned long long int)intparams[3] * (unsigned long long int)EINHEIT2;
+
+		u_data->external.bytes = tmpval;
+		ng_logout_ok("new traffic successfully set to: %llu MB",u_data->external.bytes/EINHEIT);
+	}
 }
 
 void NetGuard_Special_Limit::timer_tick() {

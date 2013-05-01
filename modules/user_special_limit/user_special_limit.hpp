@@ -102,7 +102,7 @@ class NetGuard_Special_Limit : public NetGuard_User_Module
 
 		void user_init(struct user_data *u_data);
 		void user_shutdown(struct user_data *u_data);
-		void do_user_data_forgetday(int day, struct  user_data_traffic * u_data_traffic);
+		void do_user_data_forgetday(int day, struct user_data *u_data);
 		void user_data_forgetday(int day);
 		
 		void packet_in(struct user_data *u_data, int *mode, unsigned int *vlanid, struct tpacket_hdr *h, struct ether_header *eth, struct iphdr *ip, struct tcphdr *tcp, void *data);
