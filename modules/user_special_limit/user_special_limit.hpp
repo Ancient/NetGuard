@@ -67,6 +67,7 @@ class NetGuard_Special_Limit : public NetGuard_User_Module
 		User_Data_Tools *muser_data;
 		NetGuard_State *my_dis_state;
 		NetGuard_State *my_fail_state;
+		NetGuard_State *my_enabled_state;
 
 		User_Data_Tools *userlist;
 

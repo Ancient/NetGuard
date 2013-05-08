@@ -377,6 +377,12 @@ int NetGuard_Special_Limit::init(NetGuard_Config *data)
 		return -2;
 	}
 
+	my_enabled_state = NetGuard_State_Handler::get_state(GlobalCFG::GetStr("user_special_limit.enabled_state","enabled"));
+	if (!my_enabled_state) {
+		ng_logerror("%s state %s unkown",__FUNCTION__,GlobalCFG::GetStr("user_special_limit.enabled_state","enabled").c_str());
+		return -2;
+	}
+
 	loaddata();
 
 	return 0;
@@ -457,15 +463,28 @@ void NetGuard_Special_Limit::user_shutdown(struct user_data *u_data)
 void NetGuard_Special_Limit::do_user_data_forgetday(int day, struct user_data *u_data){
 
 	struct user_special_limit_data *limit_data = (struct user_special_limit_data *)u_data->module_data[user_special_limit_module_number];
+	long long int temp = u_data->external.bytes;
+
 	if ( limit_data == NULL ) {
 		limit_data = my_user_init(u_data,true);
 	}
-	
+
 	if((u_data->external.bytes + limit_data->daily_addition) > limit_data->max_limit)
 		 u_data->external.bytes = limit_data->max_limit;
 	else
 		 u_data->external.bytes += limit_data->daily_addition;
 
+	NetGuard_User_State* nu_state = NetGuard_State_Handler::user_state(u_data);
+
+	if (*nu_state == my_enabled_state) return;
+	if (*nu_state == my_fail_state) return;
+
+	if(temp == 0){
+		if (!nu_state->set(my_enabled_state,GlobalCFG::GetStr("user_special_limit.enable_new_traffic","automatic enabling with new traffic"))) {
+			ng_logerror("%s - %s - %d - ip: %s vlan: %d - could not do the state transition from %s to %s",__FUNCTION__,__FILE__,__LINE__,inet_ntoa(*(struct in_addr *)&nu_state->Getuser().saddr),nu_state->Getuser().vlan_id,nu_state->state()->GetName().c_str(),my_dis_state->GetName().c_str());
+			return;
+		}
+	}
 }
 
 void NetGuard_Special_Limit::user_data_forgetday(int day)
