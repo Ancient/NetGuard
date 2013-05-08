@@ -686,7 +686,7 @@ void NetGuard_Security::packet_in(struct user_data *u_data, int *mode, unsigned 
 					ng_log_buff(0,"spoofed: %s",inet_ntoa(*(struct in_addr *)src_addr));
 
 				
-					if(!user_state->set(mode_disabled,GlobalCFG::GetStr("user_security.disabled_ip_spoofed","IP Spoofed"))) {
+					if(!user_state->set(mode_disabled,"%s Spoofed: %s",inet_ntoa(*(struct in_addr *)&found_data->saddr),inet_ntoa(*(struct in_addr *)src_addr))) {
 						ng_logerror("%s - %s - %d - ip: %s vlan: %d - could not do the state transition from %s to %s",__FUNCTION__,__FILE__,__LINE__,inet_ntoa(*(struct in_addr *)&user_state->Getuser().saddr),user_state->Getuser().vlan_id,user_state->state()->GetName().c_str(),mode_disabled->GetName().c_str());
 						return;
 					}
@@ -754,12 +754,12 @@ void NetGuard_Security::packet_in(struct user_data *u_data, int *mode, unsigned 
 			if (found_data)
 			{
 				//we have a matching mac for the sender but he wasnt found by his ip (as its in this modes)-> spoofing
-				ng_log_buff(2,"ip spoofed for %02x:%02x:%02x:%02x:%02x:%02x src_ip: %s", printf_mac_params((*source_mac_addr)),inet_ntoa(*(struct in_addr *)&found_data->saddr));
+				/*ng_log_buff(2,"ip spoofed for %02x:%02x:%02x:%02x:%02x:%02x src_ip: %s", printf_mac_params((*source_mac_addr)),inet_ntoa(*(struct in_addr *)&found_data->saddr));
 				ng_log_buff(0,"spoofed: %s",inet_ntoa(*(struct in_addr *)src_addr));
 				char *tmpstr = (char*)malloc(5000);
 				sprint_package(tmpstr,vlanid,h,eth,ip,tcp,data);
 				ng_log_buff(0,"%s",tmpstr);
-				free(tmpstr);
+				free(tmpstr);*/
 			} else {
 				//we dont know who send the package thats a little strange
 				//maybe we dont have all local users in the db
