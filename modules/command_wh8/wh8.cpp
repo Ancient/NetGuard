@@ -763,6 +763,7 @@ void NetGuard_Command_Input_WH8::got_input(std::vector<std::string> params, std:
 		ng_logout("wh8_loaduser - load all logins from a db containing login -> ip");
 		ng_logout("wh8_loadrooms - load all rooms from a db containing ip -> room");
 		ng_logout("wh8_set_login <ip> <login> - set hostel login - like loadusers");
+		ng_logout("wh8_clear_history <ip> - !!caution!! delete history for ip");
 	}
 
 	if (params[0] == "wh8_loaduser")
@@ -887,6 +888,38 @@ void NetGuard_Command_Input_WH8::got_input(std::vector<std::string> params, std:
 		if (!user_state) return;
 		user_state->params()->SetStr("login",params[2]);
 		ng_logout_ok("user updated");
+
+	}
+
+	if (params[0] == "wh8_clear_history")
+	{
+		if (params.size() < 1)
+		{
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: wh8_clear_history <ip>");
+			return;
+		}
+
+		struct in_addr m_ip;
+		if (!inet_aton(params[1].c_str(),&m_ip ))
+		{	
+			ng_logout_ret(RET_WRONG_SYNTAX,"usage: wh8_set_login <ip> <login>",params[0].c_str());
+			return;
+		}
+
+		unsigned int tmpvlan = (GlobalCFG::GetInt("wh8.user_vlan",0));
+		struct user_data *u_data = muser_data->get_user(&m_ip.s_addr,&tmpvlan);
+		if (!u_data) {
+			ng_logout_not_found("user not found!");
+			return;
+		}
+		if (u_data->saddr != m_ip.s_addr) {
+			ng_logout_not_found("user not found!");
+			return;
+		}
+		NetGuard_User_State *user_state = NetGuard_State_Handler::user_state(u_data);
+		if (!user_state) return;
+		user_state->clear();
+		ng_logout_ok("user history cleared");
 
 	}
 
